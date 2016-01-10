@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
     loadBitmap(&pic1, "music.bmp");
     loadBitmap(&pic2, "setting.bmp");
     loadBitmap(&pic3, "notes.bmp");
-    loadBitmap(&background, "bg.bmp");
+//    loadBitmap(&background, "bg.bmp");
     set_icon_alpha(&pic1);
     set_icon_alpha(&pic2);
     set_icon_alpha(&pic3);

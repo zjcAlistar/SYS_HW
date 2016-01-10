@@ -46,9 +46,12 @@
 #define ICON_WIDTH_SMALL 20
 #define ICON_HEIGHT_SMALL 20
 
+#define SCROLL_UNIT 30
+
 struct Context context;
 ClickableManager cm;
 int isRun = 1;
+int scrollOffset = 0;
 // 文件项
 struct fileItem {
 	struct stat st;
@@ -90,6 +93,8 @@ void h_empty(Point p);
 void h_chvm2(Point p);
 void h_chvm1(Point p);
 void h_goUp(Point p);
+void h_scrollDown(Point p);
+void h_scrollUp(Point p);
 
 char * sizeFormat(uint size);
 
@@ -299,12 +304,15 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		"createfile.bmp", (BUTTON_WIDTH + 6), TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "up.bmp", 2 * BUTTON_WIDTH + 100,
 		TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, { "trash.bmp",
-		3 * BUTTON_WIDTH + 110, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "up1.bmp", 4 * BUTTON_WIDTH + 200,
-		TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) } };
+		3 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "up1.bmp",
+		4 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "up1.bmp",
+		5 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) } };
 
 void drawFinderWnd(Context context) {
-	fill_rect(context, 0, 0, context.width, context.height, 0xFFFF);
+//	fill_rect(context, 0, 0, context.width, context.height, 0xFFFF);
 
 	draw_line(context, 0, 0, context.width - 1, 0, BORDERLINE_COLOR);
 	draw_line(context, context.width - 1, 0, context.width - 1,
@@ -389,16 +397,23 @@ Rect getPos(Context context, int n) {
 		int c = n % m;
 		int y_top = r * (ICON_ITEM_HEIGHT + ICON_ITEM_GAP_Y)+ TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + ICON_ITEM_GAP_Y;
 		int x_left = c * (ICON_ITEM_WIDTH + ICON_ITEM_GAP_X);
-		return initRect(x_left, y_top, ICON_ITEM_WIDTH,
+		return initRect(x_left, y_top + scrollOffset, ICON_ITEM_WIDTH,
 				ICON_ITEM_HEIGHT);
 	} else {
-		return initRect(0, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT + n * (LIST_ITEM_HEIGHT + LIST_ITEM_GAP), context.width,
+		return initRect(0, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT + n * (LIST_ITEM_HEIGHT + LIST_ITEM_GAP) + scrollOffset, context.width,
 				LIST_ITEM_HEIGHT);
 	}
 }
 
 // 事件处理相关操作
 void addItemEvent(ClickableManager *cm, struct fileItem item) {
+	if (style == ICON_STYLE) {
+		if (item.pos.start.y <= TOPBAR_HEIGHT + TOOLSBAR_HEIGHT)
+			return;
+	} else {
+		if (item.pos.start.y <= TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT)
+			return;
+	}
 	switch (item.st.type) {
 	case T_FILE:
 		createClickable(cm, item.pos, MSG_LPRESS, h_chooseFile);
@@ -423,7 +438,7 @@ void addListEvent(ClickableManager *cm) {
 }
 
 Handler wndEvents[] = { h_closeWnd, h_empty, h_chvm2, h_chvm1, h_newFolder,
-		h_newFile, h_goUp, h_deleteFile };
+		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp };
 
 void addWndEvent(ClickableManager *cm) {
 	int i;
@@ -447,8 +462,51 @@ struct fileItem * getFileItem(Point point) {
 	return 0;
 }
 
+void scrollDown() {
+//	struct fileItem *q = fileItemList;
+//	struct fileItem *p;
+//	while (q != 0)
+//	{
+//		p = q;
+//		q = q->next;
+//	}
+	printf(0, "tryingToScrollDown, current Offset %d\n", scrollOffset);
+	scrollOffset -= SCROLL_UNIT;
+	printf(0, "scrollDown, current Offset %d\n", scrollOffset);
+}
+
+void h_scrollDown(Point p) {
+	scrollDown();
+	freeFileItemList();
+	list(".");
+	drawFinderContent(context);
+	drawFinderWnd(context);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
+}
+
+void scrollUp() {
+//	struct fileItem *q = fileItemList;
+	printf(0, "tryingToScrollUp, current Offset %d\n", scrollOffset);
+	scrollOffset += SCROLL_UNIT;
+	printf(0, "scrollUp, current Offset %d\n", scrollOffset);
+}
+
+void h_scrollUp(Point p) {
+	scrollUp();
+	freeFileItemList();
+	list(".");
+	drawFinderContent(context);
+	drawFinderWnd(context);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
+}
+
 // Handlers
 void enterDir(char *name) {
+	scrollOffset = 0;
 	printf(0, "entering : %s\n", name);
 	if (chdir(name) < 0)
 		printf(2, "cannot cd %s\n", name);
@@ -460,6 +518,7 @@ void h_enterDir(Point p) {
 	freeFileItemList();
 	list(".");
 	drawFinderContent(context);
+	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
@@ -498,6 +557,7 @@ void h_newFile(Point p) {
 	freeFileItemList();
 	list(".");
 	drawFinderContent(context);
+	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
@@ -533,6 +593,7 @@ void h_newFolder(Point p) {
 	list(".");
 	printItemList();
 	drawFinderContent(context);
+	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
@@ -609,6 +670,7 @@ void h_deleteFile(Point p) {
 	list(".");
     printItemList();
 	drawFinderContent(context);
+	drawFinderWnd(context);
 		deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 		addWndEvent(&cm);
 		addListEvent(&cm);
@@ -627,6 +689,7 @@ void h_chooseFile(Point p) {
 		temp->chosen = 1;
 	}
 	drawFinderContent(context);
+	drawFinderWnd(context);
 }
 
 void h_closeWnd(Point p) {
@@ -638,6 +701,7 @@ void h_chvm1(Point p) {
 	freeFileItemList();
 		list(".");
 		drawFinderContent(context);
+	drawFinderWnd(context);
 			deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 			addWndEvent(&cm);
 			addListEvent(&cm);
@@ -648,6 +712,7 @@ void h_chvm2(Point p) {
 	freeFileItemList();
 		list(".");
 		drawFinderContent(context);
+	drawFinderWnd(context);
 			deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 			addWndEvent(&cm);
 			addListEvent(&cm);
@@ -658,6 +723,7 @@ void h_goUp(Point p) {
 	freeFileItemList();
 	list(".");
 	drawFinderContent(context);
+	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
@@ -698,8 +764,8 @@ int main(int argc, char *argv[]) {
 			break;
 		case MSG_UPDATE:
 			//printf(0, "update event!\n");
-			drawFinderWnd(context);
 			drawFinderContent(context);
+			drawFinderWnd(context);
 			updateWindow(winid, context.addr);
 			break;
 		case MSG_PARTIAL_UPDATE:
