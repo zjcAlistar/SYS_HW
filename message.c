@@ -128,7 +128,7 @@ void createMsg(int msg_type, int pos_x, int pos_y, char key)
 	else//鼠标事件
 	{
         if(mouse_x == -1) mouse_x = pos_x;
-        if(mouse_y == -1) mouse_y = pos_y;
+        if(mouse_y == -1) mouse_y = pos_y; 
 
         struct Window* win_ptr = getWindowByPoint(pos_x, pos_y);
         //cprintf("%d\n", win_ptr);
@@ -156,6 +156,10 @@ void createMsg(int msg_type, int pos_x, int pos_y, char key)
              	return;
             }
             
+            // cprintf("mouse_x=%d\n", mouse_x);
+            // cprintf("mouse_y=%d\n", mouse_y);
+            // cprintf("pos_x=%d\n", pos_x);
+            // cprintf("pos_y=%d\n", pos_y);
             int dx = pos_x - mouse_x;
             int dy = pos_y - mouse_y;
             
