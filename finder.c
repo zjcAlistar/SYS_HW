@@ -463,15 +463,34 @@ struct fileItem * getFileItem(Point point) {
 }
 
 void scrollDown() {
-//	struct fileItem *q = fileItemList;
-//	struct fileItem *p;
-//	while (q != 0)
-//	{
-//		p = q;
-//		q = q->next;
-//	}
-	printf(0, "tryingToScrollDown, current Offset %d\n", scrollOffset);
-	scrollOffset -= SCROLL_UNIT;
+	struct fileItem *q = fileItemList;
+	// struct fileItem *p;
+	// while (q != 0)
+	// {
+	// 	p = q;
+	// 	q = q->next;
+	// }
+	if (style == ICON_STYLE){
+		if(q->pos.start.y > (WINDOW_HEIGHT - ICON_ITEM_HEIGHT)){
+			if(q->pos.start.y > WINDOW_HEIGHT){
+				scrollOffset -= SCROLL_UNIT;
+			}
+			else{
+				scrollOffset -= (q->pos.start.y - (WINDOW_HEIGHT - ICON_ITEM_HEIGHT));
+			}
+		}
+	}
+	else{
+		if(q->pos.start.y > (WINDOW_HEIGHT - LIST_ITEM_HEIGHT)){
+			if(q->pos.start.y > WINDOW_HEIGHT){
+				scrollOffset -= SCROLL_UNIT;
+			}
+			else{
+				scrollOffset -= (q->pos.start.y - (WINDOW_HEIGHT - LIST_ITEM_HEIGHT));
+			}
+		}
+	}
+	//printf(0, "tryingToScrollDown, current Offset %d\n", scrollOffset);
 	printf(0, "scrollDown, current Offset %d\n", scrollOffset);
 }
 
@@ -487,9 +506,34 @@ void h_scrollDown(Point p) {
 }
 
 void scrollUp() {
-//	struct fileItem *q = fileItemList;
-	printf(0, "tryingToScrollUp, current Offset %d\n", scrollOffset);
-	scrollOffset += SCROLL_UNIT;
+	struct fileItem *q = fileItemList;
+	struct fileItem *p;
+	while (q != 0)
+	{
+		p = q;
+		q = q->next;
+	}
+	if (style == ICON_STYLE){
+		if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT)){
+			if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - ICON_ITEM_HEIGHT)){
+				scrollOffset += SCROLL_UNIT;
+			}
+			else{
+				scrollOffset += -(p->pos.start.y - (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT));
+			}
+		}
+	}
+	else{
+		if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT)){
+			if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT - LIST_ITEM_HEIGHT)){
+				scrollOffset += SCROLL_UNIT;
+			}
+			else{
+				scrollOffset += -(p->pos.start.y - (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT));
+			}
+		}
+	}
+	//printf(0, "tryingToScrollUp, current Offset %d\n", scrollOffset);
 	printf(0, "scrollUp, current Offset %d\n", scrollOffset);
 }
 
@@ -601,74 +645,74 @@ void h_newFolder(Point p) {
 
 void deleteFile(char *name)
 {
-    printf(0, "currently having sex with %s\n", name);
+	printf(0, "currently having sex with %s\n", name);
 	if(unlink(name) < 0){
 		if (chdir(name) < 0){
 			printf(2, "rm: %s failed to delete\n", name);
 		}
 		else{
 			freeFileItemList();
-	        list(".");
-	        struct fileItem *p;
-	        p = fileItemList;
-	        while (p != 0) {
-		        deleteFile(p->name);
-		        freeFileItemList();
-                list(".");
-                p = fileItemList;
-	        }
-            chdir("..");
-            freeFileItemList();
-            list(".");
-            unlink(name);
+			list(".");
+			struct fileItem *p;
+			p = fileItemList;
+			while (p != 0) {
+				deleteFile(p->name);
+				freeFileItemList();
+				list(".");
+				p = fileItemList;
+			}
+			chdir("..");
+			freeFileItemList();
+			list(".");
+			unlink(name);
 		}
 	}
 }
 void h_deleteFile(Point p) {
 	struct fileItem *q = fileItemList;
-    struct fileItem *p1, *head, *p2;
-    head = p1 = p2 = 0;
-    printf(0, "hi1\n");
+	struct fileItem *p1, *head, *p2;
+	head = p1 = p2 = 0;
+	printf(0, "hi1\n");
 	while (q != 0)
 	{
-        printf(0, "hi2\n");
+		printf(0, "hi2\n");
 		if (q->chosen)
 		{
-            p1 = (struct fileItem *)malloc(sizeof(struct fileItem));
-            p1->name = (char *)malloc(32 * sizeof(char));
-            strcpy(p1->name, q->name);
-            if(head == 0)
-            {
-                head = p1;
-                p2 = p1;
-            } else {
-                p2->next = p1;
-                p2 = p1;
-            }
-            p1->next = 0;
+			p1 = (struct fileItem *)malloc(sizeof(struct fileItem));
+			p1->name = (char *)malloc(32 * sizeof(char));
+			strcpy(p1->name, q->name);
+			if(head == 0)
+			{
+				head = p1;
+				p2 = p1;
+			} else {
+				p2->next = p1;
+				p2 = p1;
+			}
+			p1->next = 0;
 		}
-        q = q->next;
+		q = q->next;
 	}
-    p1 = head;
-    printf(0, "here, I know what files are chosen, and is going to delete every single one of them! wish me good luck\n");
-    while (p1 != 0)
-    {
-        deleteFile(p1->name);
-        p1 = p1->next;
-    }
-    printf(0, "i was so tm fast. :p\n");
-    p1 = head;
-    while (p1 != 0) {
-        p2 = p1;
-        printf(0, "freeing %s\n", p2->name);
-        p1 = p1->next;
-        free(p2->name);
-        free(p2);
-    }
-    printf(0, "done freeing!~~~\n");
+	p1 = head;
+	printf(0, "here, I know what files are chosen, and is going to delete every single one of them! wish me good luck\n");
+	while (p1 != 0)
+	{
+		deleteFile(p1->name);
+		p1 = p1->next;
+	}
+	printf(0, "i was so tm fast. :p\n");
+	p1 = head;
+	while (p1 != 0) {
+		p2 = p1;
+		printf(0, "freeing %s\n", p2->name);
+		p1 = p1->next;
+		free(p2->name);
+		free(p2);
+	}
+	printf(0, "done freeing!~~~\n");
 	freeFileItemList();
 	list(".");
-    printItemList();
+	printItemList();
 	drawFinderContent(context);
 	drawFinderWnd(context);
 		deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
