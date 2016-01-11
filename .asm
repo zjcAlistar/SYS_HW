@@ -956,7 +956,7 @@ char *sizeFormat(uint size){
 
 000007c2 <drawFinderWnd>:
 		8 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "paste.bmp",
 		9 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) } };
 

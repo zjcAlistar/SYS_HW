@@ -315,15 +315,15 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 				- (BUTTON_HEIGHT + 3) }, { "up.bmp", 2 * BUTTON_WIDTH + 100,
 		TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, { "trash.bmp",
 		3 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "up1.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "rollup.bmp",
 		4 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "up1.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "rolldown.bmp",
 		5 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "cut.bmp",
 		7 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "copy.bmp",
 		8 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "paste.bmp",
 		9 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) } };
 
