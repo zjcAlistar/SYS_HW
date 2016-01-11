@@ -54,6 +54,7 @@ struct Context context;
 ClickableManager cm;
 int isRun = 1;
 int scrollOffset = 0;
+int copyOrCut = 0; //0 = copy, 1 = cut;
 // 文件项
 struct fileItem {
 	struct stat st;
@@ -103,6 +104,7 @@ void h_scrollDown(Point p);
 void h_scrollUp(Point p);
 void h_copyFile(Point p);
 void h_pasteFile(Point p);
+void h_cutFile(Point p);
 
 char * sizeFormat(uint size);
 
@@ -321,6 +323,8 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		7 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
 		8 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+		9 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) } };
 
 void drawFinderWnd(Context context) {
@@ -450,7 +454,7 @@ void addListEvent(ClickableManager *cm) {
 }
 
 Handler wndEvents[] = { h_closeWnd, h_empty, h_chvm2, h_chvm1, h_newFolder,
-		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_copyFile, h_pasteFile };
+		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile };
 
 void addWndEvent(ClickableManager *cm) {
 	int i;
@@ -790,19 +794,73 @@ void copyFile(){
 }
 
 void h_copyFile(Point p){
+	copyOrCut = 0;
 	lenOfWaited = 0;
 	copyFile();
 }
 
-void h_pasteFile(Point p){
-	int i, fd;
-	for(i = 0; i < lenOfWaited; i++){
-		printf(0, "this is NO %d file names %s\n", i, filesWaited[i]);
-		fd = open(filesWaited[i], O_RDONLY);
-		if(fd > 0)
-			printf(0, "fileopensucceededededed~\n");
-		close(fd);
+void moveFile(){
+	int i;
+	for (i = 0; i < lenOfWaited; i++)
+		deleteFile(filesWaited[i]);
+	lenOfWaited = 0;
+}
+
+void h_cutFile(Point p){
+	copyOrCut = 1;
+	lenOfWaited = 0;
+	copyFile();
+}
+
+void pasteFile(){
+	int file_src, file_dest;
+	int i,j;
+	char *filename;
+	char* buff = (char*)malloc(4096 * sizeof(char));
+	memset(buff, 0, 4096);
+    int size = 0;
+    for(i = 0; i < lenOfWaited; i++){
+		printf(0, "this is NO.%d file names %s\n", i, filesWaited[i]);
+        for(j = strlen(filesWaited[i])-1; j >= 0; j--){
+        	if (*(filesWaited[i]+j) == '/'){
+        		filename = filesWaited[i] + j + 1;
+        		break;
+        	}
+        }
+        printf(0, "NO.%d file %s name get\n", i, filename);
+        file_src = open(filesWaited[i], O_RDONLY);
+		if((file_dest = open(filename, O_RDONLY)) >= 0){
+			printf(0, "NO.%d file %s already exist\n", i, filename);
+			close(file_dest);
+		}
+		else{
+			file_dest = open(filename, O_CREATE);
+			while((size = read(file_src, buff, 4096)) > 0)
+                write(file_dest, buff, size);
+	        if(size < 0)
+	        {
+	            //printf(2, "copy file error!!!\r\n");
+	            printf(0, "NO.%d file %s error\n", i, filename);
+	            return;
+	        }
+	        close(file_dest);
+		}
+		close(file_src);
 	}
+    free(buff);
+}
+
+void h_pasteFile(Point p){
+	pasteFile();
+	if(copyOrCut == 1)
+		moveFile();
+    freeFileItemList();
+	list(".");
+	drawFinderContent(context);
+	drawFinderWnd(context);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
 }
 
 void h_chooseFile(Point p) {
