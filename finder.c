@@ -47,8 +47,8 @@
 #define ICON_HEIGHT_SMALL 20
 
 #define SCROLL_UNIT 30
-#define MAX_COPY_SIZE 10
-#define MAX_NAME_LEN 32
+#define MAX_COPY_SIZE 8
+#define MAX_NAME_LEN 256
 
 struct Context context;
 ClickableManager cm;
@@ -63,11 +63,8 @@ struct fileItem {
 	struct fileItem *next;
 };
 // 待复制文件列表
-typedef struct fileWaited {
-	char name[MAX_NAME_LEN];
-	int fd;
-}fileWaited;
-fileWaited filesWaited[MAX_COPY_SIZE];
+char filesWaited[MAX_COPY_SIZE][MAX_NAME_LEN];
+char currentPath[MAX_NAME_LEN];
 int lenOfWaited;
 // 文件项列表，用于保存当前目录下所有文件
 struct fileItem *fileItemList = 0;
@@ -563,12 +560,44 @@ void h_scrollUp(Point p) {
 	addListEvent(&cm);
 }
 
+void updatePath(char *name) {
+    //printf(2, "cd success\r\n");
+    int n = strlen(name);
+    int i;
+    if (n == 2 && name[0] == '.' && name[1] == '.')
+    {
+        if (!(strlen(currentPath) == 1 && currentPath[0] == '/'))
+        {
+            int tmpn = strlen(currentPath);
+            currentPath[tmpn - 1] = '\0';
+            for (i = tmpn - 2; i > 0; i--)
+            {
+                if (currentPath[i] != '/')
+                    currentPath[i] = '\0';
+                else
+                    break;
+            }
+        }
+    }
+    else
+    {
+        int tmpn = strlen(currentPath);
+        strcpy(currentPath + tmpn, name);
+        tmpn = strlen(currentPath);
+        currentPath[tmpn] = '/';
+        currentPath[tmpn + 1] = '\0';
+    }
+}
+
 // Handlers
 void enterDir(char *name) {
 	scrollOffset = 0;
 	printf(0, "entering : %s\n", name);
 	if (chdir(name) < 0)
 		printf(2, "cannot cd %s\n", name);
+	else
+		updatePath(name);
+	printf(0, "currentPath: %s\n", currentPath);
 }
 
 void h_enterDir(Point p) {
@@ -745,10 +774,11 @@ void copyFile(){
 			}
 			else{
 				if((fd = open(p->name, O_RDONLY)) >= 0){
-					filesWaited[lenOfWaited].fd = fd;
-					strcpy(filesWaited[lenOfWaited].name, p->name);
-					printf(0, "Open File %s Succeed\n", filesWaited[lenOfWaited].name);
+					strcpy(filesWaited[lenOfWaited], currentPath);
+					strcpy(filesWaited[lenOfWaited] + strlen(currentPath), p->name);
+					printf(0, "Open File %s Succeed\n", filesWaited[lenOfWaited]);
 					lenOfWaited++;
+					close(fd);
 				}
 				else{
 					printf(0, "Open File %s Failed\n", p->name);
@@ -760,23 +790,18 @@ void copyFile(){
 }
 
 void h_copyFile(Point p){
-	int i;
-	for(i = 0; i < lenOfWaited; i++){
-		if(filesWaited[i].fd != -1){
-			close(filesWaited[i].fd);
-			filesWaited[i].fd = -1;
-		}
-	}
 	lenOfWaited = 0;
 	copyFile();
 }
 
 void h_pasteFile(Point p){
-	int i;
+	int i, fd;
 	for(i = 0; i < lenOfWaited; i++){
-		if(filesWaited[i].fd != -1){
-			printf(0, "this is NO %d file names %s\n", i, filesWaited[i].name);
-	    }
+		printf(0, "this is NO %d file names %s\n", i, filesWaited[i]);
+		fd = open(filesWaited[i], O_RDONLY);
+		if(fd > 0)
+			printf(0, "fileopensucceededededed~\n");
+		close(fd);
 	}
 }
 
@@ -838,8 +863,6 @@ void h_empty(Point p) {
 }
 
 int main(int argc, char *argv[]) {
-    
-    int i;
 	int winid;
 	struct Msg msg;
 
@@ -850,6 +873,7 @@ int main(int argc, char *argv[]) {
 	load_iconlist(wndRes, sizeof(wndRes) / sizeof(ICON));
 	load_iconlist(contentRes, sizeof(contentRes) / sizeof(ICON));
 	//testHandlers();
+	strcpy(currentPath, "/");
 	mkdir("userfolder");
 	enterDir("userfolder");
 	freeFileItemList();
@@ -857,10 +881,6 @@ int main(int argc, char *argv[]) {
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
-
-	for (i = 0; i < MAX_COPY_SIZE; ++i){
-		filesWaited[i].fd = -1;
-	}
 	lenOfWaited = 0;
 	while (isRun) {
 		getMsg(&msg);
