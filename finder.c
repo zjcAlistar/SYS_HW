@@ -47,6 +47,8 @@
 #define ICON_HEIGHT_SMALL 20
 
 #define SCROLL_UNIT 30
+#define MAX_COPY_SIZE 10
+#define MAX_NAME_LEN 32
 
 struct Context context;
 ClickableManager cm;
@@ -60,6 +62,13 @@ struct fileItem {
 	int chosen;
 	struct fileItem *next;
 };
+// 待复制文件列表
+typedef struct fileWaited {
+	char name[MAX_NAME_LEN];
+	int fd;
+}fileWaited;
+fileWaited filesWaited[MAX_COPY_SIZE];
+int lenOfWaited;
 // 文件项列表，用于保存当前目录下所有文件
 struct fileItem *fileItemList = 0;
 void addFileItem(struct stat type, char *name, Rect pos);
@@ -95,6 +104,8 @@ void h_chvm1(Point p);
 void h_goUp(Point p);
 void h_scrollDown(Point p);
 void h_scrollUp(Point p);
+void h_copyFile(Point p);
+void h_pasteFile(Point p);
 
 char * sizeFormat(uint size);
 
@@ -309,6 +320,10 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		4 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "up1.bmp",
 		5 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+		7 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "trash.bmp",
+		8 * BUTTON_WIDTH + 200, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) } };
 
 void drawFinderWnd(Context context) {
@@ -408,10 +423,10 @@ Rect getPos(Context context, int n) {
 // 事件处理相关操作
 void addItemEvent(ClickableManager *cm, struct fileItem item) {
 	if (style == ICON_STYLE) {
-		if (item.pos.start.y <= TOPBAR_HEIGHT + TOOLSBAR_HEIGHT)
+		if (item.pos.start.y < TOPBAR_HEIGHT + TOOLSBAR_HEIGHT)
 			return;
 	} else {
-		if (item.pos.start.y <= TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT)
+		if (item.pos.start.y < TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT)
 			return;
 	}
 	switch (item.st.type) {
@@ -438,7 +453,7 @@ void addListEvent(ClickableManager *cm) {
 }
 
 Handler wndEvents[] = { h_closeWnd, h_empty, h_chvm2, h_chvm1, h_newFolder,
-		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp };
+		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_copyFile, h_pasteFile };
 
 void addWndEvent(ClickableManager *cm) {
 	int i;
@@ -720,6 +735,51 @@ void h_deleteFile(Point p) {
 		addListEvent(&cm);
 }
 
+void copyFile(){
+	int fd;
+	struct fileItem *p = fileItemList;
+	while(p != 0){
+		if (p->chosen == 1){
+			if(lenOfWaited >= MAX_COPY_SIZE){
+				printf(0, "Too Much Files To Copy %d\n", lenOfWaited);
+			}
+			else{
+				if((fd = open(p->name, O_RDONLY)) >= 0){
+					filesWaited[lenOfWaited].fd = fd;
+					strcpy(filesWaited[lenOfWaited].name, p->name);
+					printf(0, "Open File %s Succeed\n", filesWaited[lenOfWaited].name);
+					lenOfWaited++;
+				}
+				else{
+					printf(0, "Open File %s Failed\n", p->name);
+				}
+			}
+		}
+		p = p->next;
+	}
+}
+
+void h_copyFile(Point p){
+	int i;
+	for(i = 0; i < lenOfWaited; i++){
+		if(filesWaited[i].fd != -1){
+			close(filesWaited[i].fd);
+			filesWaited[i].fd = -1;
+		}
+	}
+	lenOfWaited = 0;
+	copyFile();
+}
+
+void h_pasteFile(Point p){
+	int i;
+	for(i = 0; i < lenOfWaited; i++){
+		if(filesWaited[i].fd != -1){
+			printf(0, "this is NO %d file names %s\n", i, filesWaited[i].name);
+	    }
+	}
+}
+
 void h_chooseFile(Point p) {
 	struct fileItem *temp = getFileItem(p);
 	if (temp->chosen != 0)
@@ -778,7 +838,8 @@ void h_empty(Point p) {
 }
 
 int main(int argc, char *argv[]) {
-
+    
+    int i;
 	int winid;
 	struct Msg msg;
 
@@ -796,6 +857,11 @@ int main(int argc, char *argv[]) {
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
+
+	for (i = 0; i < MAX_COPY_SIZE; ++i){
+		filesWaited[i].fd = -1;
+	}
+	lenOfWaited = 0;
 	while (isRun) {
 		getMsg(&msg);
 		switch (msg.msg_type) {
