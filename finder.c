@@ -970,9 +970,9 @@ void h_deleteFile(Point p) {
 	printItemList();
 	drawFinderContent(context);
 	drawFinderWnd(context);
-		deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
-		addWndEvent(&cm);
-		addListEvent(&cm);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
 }
 
 void saveRename(){
@@ -1061,10 +1061,11 @@ void h_cutFile(Point p){
 }
 
 int pasteJustFile(char *src, char *filename){
-	printf(0, "currentPath: %s, copying from %s, to %s~", currentPath, src, filename);
+	printf(0, "currentPath: %s, copying from %s, to %s~\n", currentPath, src, filename);
 	int size = 0;
 	int file_src, file_dest;
-	struct fileItem *p = fileItemList;
+	struct fileItem *p;
+	struct fileItem *p1, *head, *p2;
 	char* buff = (char*)malloc(4096 * sizeof(char));
 	char tempSrc[MAX_NAME_LEN];
 	char tempName[MAX_NAME_LEN];
@@ -1084,20 +1085,48 @@ int pasteJustFile(char *src, char *filename){
 		mkdir(filename);
 		updatePath(filename);
 		chdir(currentPath);
-		p = fileItemList;
-		while(p != 0){
+        head = p1 = p2 = 0;
+        p = fileItemList;
+	    printf(0, "hello1\n");
+		while (p != 0)
+		{
+			printf(0, "hello2\n");
+			p1 = (struct fileItem *)malloc(sizeof(struct fileItem));
+			p1->name = (char *)malloc(32 * sizeof(char));
+			strcpy(p1->name, p->name);
+			if(head == 0)
+			{
+				head = p1;
+				p2 = p1;
+			} else {
+				p2->next = p1;
+				p2 = p1;
+			}
+			p1->next = 0;
+			p = p->next;
+		}
+		p1 = head;
+		while(p1 != 0){
 			strcpy(tempSrc, src);
-			strcpy(tempName, p->name);
+			strcpy(tempName, p1->name);
 			tempSrc[strlen(tempSrc) + 1] = 0;
 			tempSrc[strlen(tempSrc)] = '/';
 			strcpy(tempSrc+strlen(tempSrc), tempName);
-			if(!pasteJustFile(tempSrc, tempName)) return 0;
+			pasteJustFile(tempSrc, tempName);
 			memset(tempName, '\0', sizeof(tempName)/sizeof(char));
 			memset(tempSrc, '\0', sizeof(tempSrc)/sizeof(char));
-			p = p->next;
+			p1 = p1->next;
 		}
 		chdir("..");
 		updatePath("..");
+		p1 = head;
+		while (p1 != 0) {
+			p2 = p1;
+			printf(0, "freeing %s\n", p2->name);
+			p1 = p1->next;
+			free(p2->name);
+			free(p2);
+		}
 	}
 	else{
 		file_src = open(src, O_RDONLY);
@@ -1126,6 +1155,7 @@ int pasteJustFile(char *src, char *filename){
 	close(file_dest);
 	close(file_src);
 	free(buff);
+	printf(0,"copy end\n");
 	return 1;
 }
 
