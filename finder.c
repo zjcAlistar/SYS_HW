@@ -902,13 +902,34 @@ void h_cutFile(Point p){
 	copyFile();
 }
 
-void pasteFile(){
+void pasteJustFile(char *src, char *filename){
+	int size = 0;
 	int file_src, file_dest;
-	int i,j;
-	char *filename;
 	char* buff = (char*)malloc(4096 * sizeof(char));
 	memset(buff, 0, 4096);
-    int size = 0;
+	file_src = open(src, O_RDONLY);
+	if((file_dest = open(filename, O_RDONLY)) >= 0){
+		printf(0, "File %s already exist\n", filename);
+	}
+	else{
+		file_dest = open(filename, O_CREATE);
+		while((size = read(file_src, buff, 4096)) > 0)
+            write(file_dest, buff, size);
+	    if(size < 0)
+	    {
+	    	//printf(2, "copy file error!!!\r\n");
+	        printf(0, "File %s error\n", filename);
+	        return;
+	    }
+	}
+	close(file_dest);
+	close(file_src);
+	free(buff);
+}
+
+void pasteFile(){
+	int i,j;
+	char *filename;
     for(i = 0; i < lenOfWaited; i++){
 		printf(0, "this is NO.%d file names %s\n", i, filesWaited[i]);
         for(j = strlen(filesWaited[i])-1; j >= 0; j--){
@@ -918,26 +939,8 @@ void pasteFile(){
         	}
         }
         printf(0, "NO.%d file %s name get\n", i, filename);
-        file_src = open(filesWaited[i], O_RDONLY);
-		if((file_dest = open(filename, O_RDONLY)) >= 0){
-			printf(0, "NO.%d file %s already exist\n", i, filename);
-			close(file_dest);
-		}
-		else{
-			file_dest = open(filename, O_CREATE);
-			while((size = read(file_src, buff, 4096)) > 0)
-                write(file_dest, buff, size);
-	        if(size < 0)
-	        {
-	            //printf(2, "copy file error!!!\r\n");
-	            printf(0, "NO.%d file %s error\n", i, filename);
-	            return;
-	        }
-	        close(file_dest);
-		}
-		close(file_src);
+        pasteJustFile(filesWaited[i], filename);
 	}
-    free(buff);
 }
 
 void h_pasteFile(Point p){
