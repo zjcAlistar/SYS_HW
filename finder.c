@@ -98,7 +98,7 @@ int itemCounter = 0; // 第几个文件
 void addItemEvent(ClickableManager *cm, struct fileItem item);
 void addListEvent(ClickableManager *cm);
 struct fileItem * getFileItem(Point p); //跟据点击位置，获取文件信息
-void pasteJustFile(char* src, char* dest);
+int pasteJustFile(char* src, char* dest);
 
 // Handlers
 void h_enterDir(Point p);
@@ -350,8 +350,7 @@ char *sizeFormat(uint size){
 	return result;
 }
 
-struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
-		/ 2 - 22, 3 }, { "viewingmode2.bmp", WINDOW_WIDTH - (BUTTON_WIDTH + 5),
+struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", 20, 3 }, { "viewingmode2.bmp", WINDOW_WIDTH - (BUTTON_WIDTH + 5),
 		TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, {
 		"viewingmode1.bmp", WINDOW_WIDTH - (2 * BUTTON_WIDTH + 6), TOPBAR_HEIGHT
 				+ TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, { "createfolder.bmp",
@@ -378,7 +377,7 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 
 void drawFinderWnd(Context context) {
 //	fill_rect(context, 0, 0, context.width, context.height, 0xFFFF);
-
+	
 	draw_line(context, 0, 0, context.width - 1, 0, BORDERLINE_COLOR);
 	draw_line(context, context.width - 1, 0, context.width - 1,
 			context.height - 1, BORDERLINE_COLOR);
@@ -387,7 +386,7 @@ void drawFinderWnd(Context context) {
 	draw_line(context, 0, context.height - 1, 0, 0, BORDERLINE_COLOR);
 	fill_rect(context, 1, 1, context.width - 2, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT,
 			TOOLSBAR_COLOR);
-	puts_str(context, "Finder", 0, WINDOW_WIDTH / 2, 3);
+	puts_str(context, currentPath, 0, 42, 3);
 	//printf(0, "drawing window\n");
 	draw_iconlist(context, wndRes, sizeof(wndRes) / sizeof(ICON));
 	puts_str(context, keyContent.content, 0, 10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
@@ -846,17 +845,19 @@ void saveRename(){
 	char tempName[MAX_NAME_LEN + 2];
 	int i;
 	strcpy(tempName, currentlyRenaming->name);
-	for(i = 0; i < strlen(tempName); i++){
-		if(tempName[i] == '.'){
-			pasteJustFile(renameFrom, tempName);
-			deleteFile(renameFrom);
-			return;
+	if(currentlyRenaming->st.type != T_DIR){
+		for(i = 0; i < strlen(tempName); i++){
+			if(tempName[i] == '.'){
+				pasteJustFile(renameFrom, tempName);
+				deleteFile(renameFrom);
+				return;
+			}
 		}
+		tempName[i] = '.';
+		tempName[i + 1] = 0;
 	}
-	tempName[i] = '.';
-	tempName[i + 1] = 0;
-	pasteJustFile(renameFrom, tempName);
-	deleteFile(renameFrom);
+	if(pasteJustFile(renameFrom, tempName))
+		deleteFile(renameFrom);
 }
 
 void unrename(){
@@ -919,29 +920,67 @@ void h_cutFile(Point p){
 	copyFile();
 }
 
-void pasteJustFile(char *src, char *filename){
+int pasteJustFile(char *src, char *filename){
 	int size = 0;
 	int file_src, file_dest;
+	struct fileItem *p = fileItemList;
 	char* buff = (char*)malloc(4096 * sizeof(char));
+	char tempSrc[MAX_NAME_LEN];
+	char tempName[MAX_NAME_LEN];
+	memset(tempName, '\0', sizeof(tempName)/sizeof(char));
+	memset(tempSrc, '\0', sizeof(tempSrc)/sizeof(char));
 	memset(buff, 0, 4096);
-	file_src = open(src, O_RDONLY);
-	if((file_dest = open(filename, O_RDONLY)) >= 0){
-		printf(0, "File %s already exist\n", filename);
+	printf(0, "sorddd copy~ %s\n", src);
+	if(chdir(src) >= 0){
+		freeFileItemList();
+		list(".");
+		chdir(currentPath);
+		mkdir(filename);
+		updatePath(filename);
+		chdir(currentPath);
+		p = fileItemList;
+		while(p != 0){
+			strcpy(tempSrc, src);
+			strcpy(tempName, p->name);
+			tempSrc[strlen(tempSrc) + 1] = 0;
+			tempSrc[strlen(tempSrc)] = '/';
+			strcpy(tempSrc+strlen(tempSrc), tempName);
+			if(!pasteJustFile(tempSrc, tempName)) return 0;
+			memset(tempName, '\0', sizeof(tempName)/sizeof(char));
+			memset(tempSrc, '\0', sizeof(tempSrc)/sizeof(char));
+			p = p->next;
+		}
+		chdir("..");
+		updatePath("..");
 	}
 	else{
-		file_dest = open(filename, O_CREATE);
-		while((size = read(file_src, buff, 4096)) > 0)
-            write(file_dest, buff, size);
-	    if(size < 0)
-	    {
-	    	//printf(2, "copy file error!!!\r\n");
-	        printf(0, "File %s error\n", filename);
-	        return;
-	    }
+		file_src = open(src, O_RDONLY);
+		if((file_dest = open(filename, O_RDONLY)) >= 0){
+			printf(0, "File %s already exist\n", filename);
+			close(file_dest);
+	        close(file_src);
+	        free(buff);
+			return 0;
+		}
+		else{
+			file_dest = open(filename, O_CREATE);
+			while((size = read(file_src, buff, 4096)) > 0)
+				write(file_dest, buff, size);
+			if(size < 0)
+			{
+				//printf(2, "copy file error!!!\r\n");
+				printf(0, "File %s error\n", filename);
+				close(file_dest);
+	            close(file_src);
+	            free(buff);
+				return 0;
+			}
+		}
 	}
 	close(file_dest);
 	close(file_src);
 	free(buff);
+	return 1;
 }
 
 void pasteFile(){
