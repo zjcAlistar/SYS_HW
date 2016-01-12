@@ -57,6 +57,7 @@ ClickableManager cm;
 int isRun = 1;
 int scrollOffset = 0;
 int copyOrCut = 0; //0 = copy, 1 = cut;
+struct fileItem* currentlyRenaming = 0;
 
 struct keyContent {
 	char content[MAX_KEYLENGTH];
@@ -74,6 +75,7 @@ struct fileItem {
 // 待复制文件列表
 char filesWaited[MAX_COPY_SIZE][MAX_NAME_LEN];
 char currentPath[MAX_NAME_LEN];
+char renameFrom[MAX_NAME_LEN];
 int lenOfWaited;
 // 文件项列表，用于保存当前目录下所有文件
 struct fileItem *fileItemList = 0;
@@ -96,6 +98,7 @@ int itemCounter = 0; // 第几个文件
 void addItemEvent(ClickableManager *cm, struct fileItem item);
 void addListEvent(ClickableManager *cm);
 struct fileItem * getFileItem(Point p); //跟据点击位置，获取文件信息
+void pasteJustFile(char* src, char* dest);
 
 // Handlers
 void h_enterDir(Point p);
@@ -114,6 +117,7 @@ void h_copyFile(Point p);
 void h_pasteFile(Point p);
 void h_cutFile(Point p);
 void h_searchbox(Point p);
+void h_rename(Point p);
 
 char * sizeFormat(uint size);
 
@@ -268,10 +272,14 @@ void drawItem(Context context, char *name, struct stat st, Rect rect, int chosen
 	unsigned short nameColor;
 	if (chosen == 0) 
 		nameColor = 0x0;
-	else 
+	else if (chosen == 1)
 	{
 		nameColor = 0xFFFF;
 		fill_rect(context, rect.start.x, rect.start.y, rect.width, rect.height, 0x2110);
+	} else
+	{
+		nameColor = 0xFFFF;
+		fill_rect(context, rect.start.x, rect.start.y, rect.width, rect.height, 0);
 	}
 	if (style == ICON_STYLE) {
 		switch (st.type) {
@@ -364,7 +372,9 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		9 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "blank.bmp",
 		10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) } };
+				- (BUTTON_HEIGHT + 3) }, { "cut.bmp",
+		2 * BUTTON_WIDTH, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }  };
 
 void drawFinderWnd(Context context) {
 //	fill_rect(context, 0, 0, context.width, context.height, 0xFFFF);
@@ -514,7 +524,7 @@ void addListEvent(ClickableManager *cm) {
 }
 
 Handler wndEvents[] = { h_closeWnd, h_empty, h_chvm2, h_chvm1, h_newFolder,
-		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile, h_searchbox};
+		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile, h_searchbox, h_rename};
 
 void addWndEvent(ClickableManager *cm) {
 	int i;
@@ -832,6 +842,39 @@ void h_deleteFile(Point p) {
 		addListEvent(&cm);
 }
 
+void saveRename(){
+	char tempName[MAX_NAME_LEN + 2];
+	int i;
+	strcpy(tempName, currentlyRenaming->name);
+	for(i = 0; i < strlen(tempName); i++){
+		if(tempName[i] == '.'){
+			pasteJustFile(renameFrom, tempName);
+			deleteFile(renameFrom);
+			return;
+		}
+	}
+	tempName[i] = '.';
+	tempName[i + 1] = 0;
+	pasteJustFile(renameFrom, tempName);
+	deleteFile(renameFrom);
+}
+
+void unrename(){
+	printf(0, "renaming! currentlyRenaming: %s\n", currentlyRenaming->name);
+	saveRename();
+	currentlyRenaming->chosen = 1;
+	currentlyRenaming = 0;
+	renaming = 0;
+	freeFileItemList();
+	list(".");
+	printItemList();
+	drawFinderContent(context);
+	drawFinderWnd(context);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
+}
+
 void copyFile(){
 	int fd;
 	struct fileItem *p = fileItemList;
@@ -987,6 +1030,27 @@ void h_empty(Point p) {
 
 }
 
+void rename() {
+	struct fileItem *temp = fileItemList;
+	while (temp != 0){
+		if (temp->chosen == 1){
+			currentlyRenaming = temp;
+			temp->chosen = 2;
+			strcpy(renameFrom, temp->name);
+			renaming = 1;
+			break;
+		}
+		else
+			temp = temp->next;
+	}
+}
+
+void h_rename(Point p) {
+	rename();
+	drawFinderContent(context);
+	drawFinderWnd(context);
+}
+
 int main(int argc, char *argv[]) {
 	int winid;
 	struct Msg msg;
@@ -1035,8 +1099,11 @@ int main(int argc, char *argv[]) {
 			//printf(0, "left click event!\n");
 			p = initPoint(msg.concrete_msg.msg_mouse.x,
 					msg.concrete_msg.msg_mouse.y);
+			if(renaming == 1){
+				unrename();
+				updateWindow(winid, context.addr);
+			}
 			if (executeHandler(cm.left_click, p)) {
-
 				updateWindow(winid, context.addr);
 			}
 			break;
@@ -1056,6 +1123,20 @@ int main(int argc, char *argv[]) {
 				}
 				else if (key == 8 && keyContent.length > 0) {
 					keyContent.content[--keyContent.length] = 0;
+				}
+				drawFinderContent(context);
+				drawFinderWnd(context);
+				updateWindow(winid, context.addr);
+			}
+			if (renaming) {
+				if (((key=='_')||(key=='.')||(key>='0'&&key<='9')||(key>='a'&&key<='z')||(key>='A'&&key<='Z')) && (strlen(currentlyRenaming->name)<30)) {
+					currentlyRenaming->name[strlen(currentlyRenaming->name) + 1] = 0;
+					currentlyRenaming->name[strlen(currentlyRenaming->name)] = key;
+				}
+				else if (key == 8 && (strlen(currentlyRenaming->name)>0)) {
+					currentlyRenaming->name[strlen(currentlyRenaming->name) - 1] = 0;
+				} else if (key == '\n') {
+					unrename();
 				}
 				drawFinderContent(context);
 				drawFinderWnd(context);
