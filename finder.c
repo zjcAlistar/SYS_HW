@@ -127,22 +127,22 @@ void testHandlers();
 
 char* strstr(const char *s1, const char *s2)  
 {  
-    int n;  
-    if (*s2)  
-    {  
-        while (*s1)  
-        {  
-            for (n=0; *(s1 + n) == *(s2 + n); n++)  
-            {  
-                if (!*(s2 + n + 1))  
-                    return (char *)s1;  
-            }  
-            s1++;  
-        }  
-        return 0;  
-    }  
-    else  
-        return (char *)s1;  
+	int n;  
+	if (*s2)  
+	{  
+		while (*s1)  
+		{  
+			for (n=0; *(s1 + n) == *(s2 + n); n++)  
+			{  
+				if (!*(s2 + n + 1))  
+					return (char *)s1;  
+			}  
+			s1++;  
+		}  
+		return 0;  
+	}  
+	else  
+		return (char *)s1;  
 }  
 
 void init_keyContent() {
@@ -412,7 +412,7 @@ void drawFinderContent(Context context) {
 //	p = fileItemList;
 //	q = 0;
 	if (keyContent.length == 0) {
-		printf(0, "currently no searching pattern, so it should display all the files!\ndon't you think so?\n");
+		//printf(0, "currently no searching pattern, so it should display all the files!\ndon't you think so?\n");
 //		freeFileItemList();
 //		list(".");
 		p = fileItemList;
@@ -426,10 +426,10 @@ void drawFinderContent(Context context) {
 		p = fileItemList;
 		while(p != 0) {
 			printf(0, "now you are searching!\n");
-		   	if (strstr(p->name, keyContent.content)) {
+			if (strstr(p->name, keyContent.content)) {
 				drawItem(context, p->name, p->st, getPos(context, tempItemCounter++), p->chosen);
 				printf(0, "now you are searching! printing\n");
-		   	}
+			}
 			p = p->next;
 			
 		}
@@ -638,32 +638,32 @@ void h_scrollUp(Point p) {
 }
 
 void updatePath(char *name) {
-    //printf(2, "cd success\r\n");
-    int n = strlen(name);
-    int i;
-    if (n == 2 && name[0] == '.' && name[1] == '.')
-    {
-        if (!(strlen(currentPath) == 1 && currentPath[0] == '/'))
-        {
-            int tmpn = strlen(currentPath);
-            currentPath[tmpn - 1] = '\0';
-            for (i = tmpn - 2; i > 0; i--)
-            {
-                if (currentPath[i] != '/')
-                    currentPath[i] = '\0';
-                else
-                    break;
-            }
-        }
-    }
-    else
-    {
-        int tmpn = strlen(currentPath);
-        strcpy(currentPath + tmpn, name);
-        tmpn = strlen(currentPath);
-        currentPath[tmpn] = '/';
-        currentPath[tmpn + 1] = '\0';
-    }
+	//printf(2, "cd success\r\n");
+	int n = strlen(name);
+	int i;
+	if (n == 2 && name[0] == '.' && name[1] == '.')
+	{
+		if (!(strlen(currentPath) == 1 && currentPath[0] == '/'))
+		{
+			int tmpn = strlen(currentPath);
+			currentPath[tmpn - 1] = '\0';
+			for (i = tmpn - 2; i > 0; i--)
+			{
+				if (currentPath[i] != '/')
+					currentPath[i] = '\0';
+				else
+					break;
+			}
+		}
+	}
+	else
+	{
+		int tmpn = strlen(currentPath);
+		strcpy(currentPath + tmpn, name);
+		tmpn = strlen(currentPath);
+		currentPath[tmpn] = '/';
+		currentPath[tmpn + 1] = '\0';
+	}
 }
 
 // Handlers
@@ -842,22 +842,28 @@ void h_deleteFile(Point p) {
 }
 
 void saveRename(){
-	char tempName[MAX_NAME_LEN + 2];
+	char tempName[MAX_NAME_LEN];
+	char tempNameFrom[MAX_NAME_LEN];
 	int i;
+	strcpy(tempNameFrom, currentPath);
 	strcpy(tempName, currentlyRenaming->name);
+	strcpy(tempNameFrom + strlen(tempNameFrom), renameFrom);
+	printf(0, "why? %s", tempName);
 	if(currentlyRenaming->st.type != T_DIR){
 		for(i = 0; i < strlen(tempName); i++){
 			if(tempName[i] == '.'){
-				pasteJustFile(renameFrom, tempName);
-				deleteFile(renameFrom);
-				return;
+				if(pasteJustFile(tempNameFrom, tempName)){
+					deleteFile(tempNameFrom);
+					return;
+				}
 			}
 		}
 		tempName[i] = '.';
 		tempName[i + 1] = 0;
 	}
-	if(pasteJustFile(renameFrom, tempName))
-		deleteFile(renameFrom);
+	printf(0, "renameFrom is %s\n", tempNameFrom);
+	if(pasteJustFile(tempNameFrom, tempName))
+		deleteFile(tempNameFrom);
 }
 
 void unrename(){
@@ -921,6 +927,7 @@ void h_cutFile(Point p){
 }
 
 int pasteJustFile(char *src, char *filename){
+	printf(0, "currentPath: %s, copying from %s, to %s~", currentPath, src, filename);
 	int size = 0;
 	int file_src, file_dest;
 	struct fileItem *p = fileItemList;
@@ -930,8 +937,13 @@ int pasteJustFile(char *src, char *filename){
 	memset(tempName, '\0', sizeof(tempName)/sizeof(char));
 	memset(tempSrc, '\0', sizeof(tempSrc)/sizeof(char));
 	memset(buff, 0, 4096);
-	printf(0, "sorddd copy~ %s\n", src);
-	if(chdir(src) >= 0){
+	if(chdir(filename) >= 0){
+		printf(0, "Directory %s already exist\n", filename);
+		free(buff);
+		chdir("..");
+		return 0;
+	}
+	else if(chdir(src) >= 0){
 		freeFileItemList();
 		list(".");
 		chdir(currentPath);
@@ -958,8 +970,8 @@ int pasteJustFile(char *src, char *filename){
 		if((file_dest = open(filename, O_RDONLY)) >= 0){
 			printf(0, "File %s already exist\n", filename);
 			close(file_dest);
-	        close(file_src);
-	        free(buff);
+			close(file_src);
+			free(buff);
 			return 0;
 		}
 		else{
@@ -971,8 +983,8 @@ int pasteJustFile(char *src, char *filename){
 				//printf(2, "copy file error!!!\r\n");
 				printf(0, "File %s error\n", filename);
 				close(file_dest);
-	            close(file_src);
-	            free(buff);
+				close(file_src);
+				free(buff);
 				return 0;
 			}
 		}
@@ -986,16 +998,16 @@ int pasteJustFile(char *src, char *filename){
 void pasteFile(){
 	int i,j;
 	char *filename;
-    for(i = 0; i < lenOfWaited; i++){
+	for(i = 0; i < lenOfWaited; i++){
 		printf(0, "this is NO.%d file names %s\n", i, filesWaited[i]);
-        for(j = strlen(filesWaited[i])-1; j >= 0; j--){
-        	if (*(filesWaited[i]+j) == '/'){
-        		filename = filesWaited[i] + j + 1;
-        		break;
-        	}
-        }
-        printf(0, "NO.%d file %s name get\n", i, filename);
-        pasteJustFile(filesWaited[i], filename);
+		for(j = strlen(filesWaited[i])-1; j >= 0; j--){
+			if (*(filesWaited[i]+j) == '/'){
+				filename = filesWaited[i] + j + 1;
+				break;
+			}
+		}
+		printf(0, "NO.%d file %s name get\n", i, filename);
+		pasteJustFile(filesWaited[i], filename);
 	}
 }
 
@@ -1003,7 +1015,7 @@ void h_pasteFile(Point p){
 	pasteFile();
 	if(copyOrCut == 1)
 		moveFile();
-    freeFileItemList();
+	freeFileItemList();
 	list(".");
 	drawFinderContent(context);
 	drawFinderWnd(context);
