@@ -2,3 +2,4 @@
 #define TOOLSBAR_HEIGHT 50
 
 int isSearching;
+int renaming;

@@ -58,6 +58,7 @@ int isRun = 1;
 int scrollOffset = 0;
 int copyOrCut = 0; //0 = copy, 1 = cut;
 int flag_fileSort = 0;
+struct fileItem* currentlyRenaming = 0;
 
 struct keyContent {
 	char content[MAX_KEYLENGTH];
@@ -75,6 +76,7 @@ struct fileItem {
 // 待复制文件列表
 char filesWaited[MAX_COPY_SIZE][MAX_NAME_LEN];
 char currentPath[MAX_NAME_LEN];
+char renameFrom[MAX_NAME_LEN];
 int lenOfWaited;
 // 文件项列表，用于保存当前目录下所有文件
 struct fileItem *fileItemList = 0;
@@ -97,6 +99,7 @@ int itemCounter = 0; // 第几个文件
 void addItemEvent(ClickableManager *cm, struct fileItem item);
 void addListEvent(ClickableManager *cm);
 struct fileItem * getFileItem(Point p); //跟据点击位置，获取文件信息
+int pasteJustFile(char* src, char* dest);
 
 // Handlers
 void h_enterDir(Point p);
@@ -116,6 +119,7 @@ void h_pasteFile(Point p);
 void h_cutFile(Point p);
 void h_searchbox(Point p);
 void h_fileSortByName(Point p);
+void h_rename(Point p);
 
 char * sizeFormat(uint size);
 void updateFileList(Context context);
@@ -126,22 +130,22 @@ void testHandlers();
 
 char* strstr(const char *s1, const char *s2)  
 {  
-    int n;  
-    if (*s2)  
-    {  
-        while (*s1)  
-        {  
-            for (n=0; *(s1 + n) == *(s2 + n); n++)  
-            {  
-                if (!*(s2 + n + 1))  
-                    return (char *)s1;  
-            }  
-            s1++;  
-        }  
-        return 0;  
-    }  
-    else  
-        return (char *)s1;  
+	int n;  
+	if (*s2)  
+	{  
+		while (*s1)  
+		{  
+			for (n=0; *(s1 + n) == *(s2 + n); n++)  
+			{  
+				if (!*(s2 + n + 1))  
+					return (char *)s1;  
+			}  
+			s1++;  
+		}  
+		return 0;  
+	}  
+	else  
+		return (char *)s1;  
 }  
 
 // int strcmp(char* str1, char* str2){
@@ -347,10 +351,14 @@ void drawItem(Context context, char *name, struct stat st, Rect rect, int chosen
 	unsigned short nameColor;
 	if (chosen == 0) 
 		nameColor = 0x0;
-	else 
+	else if (chosen == 1)
 	{
 		nameColor = 0xFFFF;
 		fill_rect(context, rect.start.x, rect.start.y, rect.width, rect.height, 0x2110);
+	} else
+	{
+		nameColor = 0xFFFF;
+		fill_rect(context, rect.start.x, rect.start.y, rect.width, rect.height, 0);
 	}
 	if (style == ICON_STYLE) {
 		switch (st.type) {
@@ -421,8 +429,7 @@ char *sizeFormat(uint size){
 	return result;
 }
 
-struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
-		/ 2 - 22, 3 }, { "viewingmode2.bmp", WINDOW_WIDTH - (BUTTON_WIDTH + 5),
+struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", 20, 3 }, { "viewingmode2.bmp", WINDOW_WIDTH - (BUTTON_WIDTH + 5),
 		TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, {
 		"viewingmode1.bmp", WINDOW_WIDTH - (2 * BUTTON_WIDTH + 6), TOPBAR_HEIGHT
 				+ TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, { "createfolder.bmp",
@@ -431,9 +438,9 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 				- (BUTTON_HEIGHT + 3) }, { "up.bmp", 2 * BUTTON_WIDTH + 50,
 		TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - (BUTTON_HEIGHT + 3) }, { "trash.bmp",
 		3 * BUTTON_WIDTH + 50, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "rollup.bmp",
-		4 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "rolldown.bmp",
+		4 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "rollup.bmp",
 		5 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "cut.bmp",
 		7 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
@@ -441,11 +448,15 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		8 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "paste.bmp",
 		9 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "blank.bmp",
+		10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) }, { "cut.bmp",
+		2 * BUTTON_WIDTH + 7, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }  };
 
 void drawFinderWnd(Context context) {
 //	fill_rect(context, 0, 0, context.width, context.height, 0xFFFF);
-
+	
 	draw_line(context, 0, 0, context.width - 1, 0, BORDERLINE_COLOR);
 	draw_line(context, context.width - 1, 0, context.width - 1,
 			context.height - 1, BORDERLINE_COLOR);
@@ -454,7 +465,7 @@ void drawFinderWnd(Context context) {
 	draw_line(context, 0, context.height - 1, 0, 0, BORDERLINE_COLOR);
 	fill_rect(context, 1, 1, context.width - 2, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT,
 			TOOLSBAR_COLOR);
-	puts_str(context, "Finder", 0, WINDOW_WIDTH / 2, 3);
+	puts_str(context, currentPath, 0, 42, 3);
 	//printf(0, "drawing window\n");
 	draw_iconlist(context, wndRes, sizeof(wndRes) / sizeof(ICON));
 	draw_searchbox();
@@ -630,7 +641,7 @@ void addListEvent(ClickableManager *cm) {
 }
 
 Handler wndEvents[] = { h_closeWnd, h_empty, h_chvm2, h_chvm1, h_newFolder,
-		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile};
+		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile, h_searchbox, h_rename};
 
 void addWndEvent(ClickableManager *cm) {
 	int i;
@@ -768,32 +779,32 @@ void h_scrollUp(Point p) {
 }
 
 void updatePath(char *name) {
-    //printf(2, "cd success\r\n");
-    int n = strlen(name);
-    int i;
-    if (n == 2 && name[0] == '.' && name[1] == '.')
-    {
-        if (!(strlen(currentPath) == 1 && currentPath[0] == '/'))
-        {
-            int tmpn = strlen(currentPath);
-            currentPath[tmpn - 1] = '\0';
-            for (i = tmpn - 2; i > 0; i--)
-            {
-                if (currentPath[i] != '/')
-                    currentPath[i] = '\0';
-                else
-                    break;
-            }
-        }
-    }
-    else
-    {
-        int tmpn = strlen(currentPath);
-        strcpy(currentPath + tmpn, name);
-        tmpn = strlen(currentPath);
-        currentPath[tmpn] = '/';
-        currentPath[tmpn + 1] = '\0';
-    }
+	//printf(2, "cd success\r\n");
+	int n = strlen(name);
+	int i;
+	if (n == 2 && name[0] == '.' && name[1] == '.')
+	{
+		if (!(strlen(currentPath) == 1 && currentPath[0] == '/'))
+		{
+			int tmpn = strlen(currentPath);
+			currentPath[tmpn - 1] = '\0';
+			for (i = tmpn - 2; i > 0; i--)
+			{
+				if (currentPath[i] != '/')
+					currentPath[i] = '\0';
+				else
+					break;
+			}
+		}
+	}
+	else
+	{
+		int tmpn = strlen(currentPath);
+		strcpy(currentPath + tmpn, name);
+		tmpn = strlen(currentPath);
+		currentPath[tmpn] = '/';
+		currentPath[tmpn + 1] = '\0';
+	}
 }
 
 // Handlers
@@ -964,6 +975,47 @@ void h_deleteFile(Point p) {
 		addListEvent(&cm);
 }
 
+void saveRename(){
+	char tempName[MAX_NAME_LEN];
+	char tempNameFrom[MAX_NAME_LEN];
+	int i;
+	strcpy(tempNameFrom, currentPath);
+	strcpy(tempName, currentlyRenaming->name);
+	strcpy(tempNameFrom + strlen(tempNameFrom), renameFrom);
+	printf(0, "why? %s", tempName);
+	if(currentlyRenaming->st.type != T_DIR){
+		for(i = 0; i < strlen(tempName); i++){
+			if(tempName[i] == '.'){
+				if(pasteJustFile(tempNameFrom, tempName)){
+					deleteFile(tempNameFrom);
+					return;
+				}
+			}
+		}
+		tempName[i] = '.';
+		tempName[i + 1] = 0;
+	}
+	printf(0, "renameFrom is %s\n", tempNameFrom);
+	if(pasteJustFile(tempNameFrom, tempName))
+		deleteFile(tempNameFrom);
+}
+
+void unrename(){
+	printf(0, "renaming! currentlyRenaming: %s\n", currentlyRenaming->name);
+	saveRename();
+	currentlyRenaming->chosen = 1;
+	currentlyRenaming = 0;
+	renaming = 0;
+	freeFileItemList();
+	list(".");
+	printItemList();
+	drawFinderContent(context);
+	drawFinderWnd(context);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
+}
+
 void copyFile(){
 	int fd;
 	struct fileItem *p = fileItemList;
@@ -1008,42 +1060,89 @@ void h_cutFile(Point p){
 	copyFile();
 }
 
-void pasteFile(){
+int pasteJustFile(char *src, char *filename){
+	printf(0, "currentPath: %s, copying from %s, to %s~", currentPath, src, filename);
+	int size = 0;
 	int file_src, file_dest;
-	int i,j;
-	char *filename;
+	struct fileItem *p = fileItemList;
 	char* buff = (char*)malloc(4096 * sizeof(char));
+	char tempSrc[MAX_NAME_LEN];
+	char tempName[MAX_NAME_LEN];
+	memset(tempName, '\0', sizeof(tempName)/sizeof(char));
+	memset(tempSrc, '\0', sizeof(tempSrc)/sizeof(char));
 	memset(buff, 0, 4096);
-    int size = 0;
-    for(i = 0; i < lenOfWaited; i++){
-		printf(0, "this is NO.%d file names %s\n", i, filesWaited[i]);
-        for(j = strlen(filesWaited[i])-1; j >= 0; j--){
-        	if (*(filesWaited[i]+j) == '/'){
-        		filename = filesWaited[i] + j + 1;
-        		break;
-        	}
-        }
-        printf(0, "NO.%d file %s name get\n", i, filename);
-        file_src = open(filesWaited[i], O_RDONLY);
+	if(chdir(filename) >= 0){
+		printf(0, "Directory %s already exist\n", filename);
+		free(buff);
+		chdir("..");
+		return 0;
+	}
+	else if(chdir(src) >= 0){
+		freeFileItemList();
+		list(".");
+		chdir(currentPath);
+		mkdir(filename);
+		updatePath(filename);
+		chdir(currentPath);
+		p = fileItemList;
+		while(p != 0){
+			strcpy(tempSrc, src);
+			strcpy(tempName, p->name);
+			tempSrc[strlen(tempSrc) + 1] = 0;
+			tempSrc[strlen(tempSrc)] = '/';
+			strcpy(tempSrc+strlen(tempSrc), tempName);
+			if(!pasteJustFile(tempSrc, tempName)) return 0;
+			memset(tempName, '\0', sizeof(tempName)/sizeof(char));
+			memset(tempSrc, '\0', sizeof(tempSrc)/sizeof(char));
+			p = p->next;
+		}
+		chdir("..");
+		updatePath("..");
+	}
+	else{
+		file_src = open(src, O_RDONLY);
 		if((file_dest = open(filename, O_RDONLY)) >= 0){
-			printf(0, "NO.%d file %s already exist\n", i, filename);
+			printf(0, "File %s already exist\n", filename);
 			close(file_dest);
+			close(file_src);
+			free(buff);
+			return 0;
 		}
 		else{
 			file_dest = open(filename, O_CREATE);
 			while((size = read(file_src, buff, 4096)) > 0)
-                write(file_dest, buff, size);
-	        if(size < 0)
-	        {
-	            //printf(2, "copy file error!!!\r\n");
-	            printf(0, "NO.%d file %s error\n", i, filename);
-	            return;
-	        }
-	        close(file_dest);
+				write(file_dest, buff, size);
+			if(size < 0)
+			{
+				//printf(2, "copy file error!!!\r\n");
+				printf(0, "File %s error\n", filename);
+				close(file_dest);
+				close(file_src);
+				free(buff);
+				return 0;
+			}
 		}
-		close(file_src);
 	}
-    free(buff);
+	close(file_dest);
+	close(file_src);
+	free(buff);
+	return 1;
+}
+
+void pasteFile(){
+	int i,j;
+	char *filename;
+	for(i = 0; i < lenOfWaited; i++){
+		printf(0, "this is NO.%d file names %s\n", i, filesWaited[i]);
+		for(j = strlen(filesWaited[i])-1; j >= 0; j--){
+			if (*(filesWaited[i]+j) == '/'){
+				filename = filesWaited[i] + j + 1;
+				break;
+			}
+		}
+		printf(0, "NO.%d file %s name get\n", i, filename);
+		pasteJustFile(filesWaited[i], filename);
+	}
 }
 
 void h_pasteFile(Point p){
@@ -1112,6 +1211,27 @@ void h_empty(Point p) {
 
 }
 
+void rename() {
+	struct fileItem *temp = fileItemList;
+	while (temp != 0){
+		if (temp->chosen == 1){
+			currentlyRenaming = temp;
+			temp->chosen = 2;
+			strcpy(renameFrom, temp->name);
+			renaming = 1;
+			break;
+		}
+		else
+			temp = temp->next;
+	}
+}
+
+void h_rename(Point p) {
+	rename();
+	drawFinderContent(context);
+	drawFinderWnd(context);
+}
+
 int main(int argc, char *argv[]) {
 	int winid;
 	struct Msg msg;
@@ -1163,6 +1283,10 @@ int main(int argc, char *argv[]) {
 			// if (executeHandler(cm.left_click, p)) {
 			// 	updateWindow(winid, context.addr);
 			// }
+			if(renaming == 1){
+				unrename();
+				updateWindow(winid, context.addr);
+			}
 			executeHandler(cm.left_click, p);
 			draw_searchbox();
 			puts_str(context, keyContent.content, 0, 10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
@@ -1192,6 +1316,20 @@ int main(int argc, char *argv[]) {
 				addWndEvent(&cm);
 				updateFileList(context);
 				addListEvent(&cm);
+				drawFinderContent(context);
+				drawFinderWnd(context);
+				updateWindow(winid, context.addr);
+			}
+			if (renaming) {
+				if (((key=='_')||(key=='.')||(key>='0'&&key<='9')||(key>='a'&&key<='z')||(key>='A'&&key<='Z')) && (strlen(currentlyRenaming->name)<30)) {
+					currentlyRenaming->name[strlen(currentlyRenaming->name) + 1] = 0;
+					currentlyRenaming->name[strlen(currentlyRenaming->name)] = key;
+				}
+				else if (key == 8 && (strlen(currentlyRenaming->name)>0)) {
+					currentlyRenaming->name[strlen(currentlyRenaming->name) - 1] = 0;
+				} else if (key == '\n') {
+					unrename();
+				}
 				drawFinderContent(context);
 				drawFinderWnd(context);
 				updateWindow(winid, context.addr);
