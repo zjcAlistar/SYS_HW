@@ -57,6 +57,7 @@ ClickableManager cm;
 int isRun = 1;
 int scrollOffset = 0;
 int copyOrCut = 0; //0 = copy, 1 = cut;
+int flag_fileSort = 0;
 
 struct keyContent {
 	char content[MAX_KEYLENGTH];
@@ -114,8 +115,10 @@ void h_copyFile(Point p);
 void h_pasteFile(Point p);
 void h_cutFile(Point p);
 void h_searchbox(Point p);
+void h_fileSortByName(Point p);
 
 char * sizeFormat(uint size);
+void updateFileList(Context context);
 
 //测试相关函数
 void printItemList();
@@ -141,6 +144,14 @@ char* strstr(const char *s1, const char *s2)
         return (char *)s1;  
 }  
 
+// int strcmp(char* str1, char* str2){
+//     while(*str1 && *str2 && *str1==*str2){
+//         ++str1;
+//         ++str2;
+//     }
+//     return *str1-*str2;
+// }
+
 void init_keyContent() {
 	int i;
 	for (i=0; i<MAX_KEYLENGTH; i++)
@@ -148,6 +159,74 @@ void init_keyContent() {
 	keyContent.length = 0;
 }
 
+void draw_searchbox() {
+	createClickable(&cm, initRect(10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3), 100, BUTTON_HEIGHT), MSG_LPRESS, h_searchbox);
+	if (isSearching == 0) {
+		fill_rect(context, 10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3), 100, BUTTON_HEIGHT, 0xFFFF);
+	}
+	else {
+		fill_rect(context, 10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3), 100, BUTTON_HEIGHT, 0xCCCC);
+	}
+}
+
+void fileSortByName() {
+	updateFileList(context);
+	struct fileItem *head;
+	head = fileItemList;
+	int tempItemCounter = 0;
+
+    struct fileItem *first; 
+    struct fileItem *t;  
+    struct fileItem *p; 
+    struct fileItem *q; 
+  
+    first = head->next; 
+    head->next = 0; 
+  
+    while (first != 0) 
+    {
+    	tempItemCounter++; 
+        if (flag_fileSort == 0) {
+	        for (t = first, q = head; ((q != 0) && (strcmp(q->name, t->name) < 0)); p = q, q = q->next)
+	        {
+
+	        } 
+        }
+        else{
+	        for (t = first, q = head; ((q != 0) && (strcmp(q->name, t->name) > 0)); p = q, q = q->next)
+	        {
+
+	        }
+        }
+       
+        first = first->next;  
+    
+        if (q == head)   
+        {  
+            head = t;  
+        }  
+        else   
+        {  
+            p->next = t;  
+        }  
+        t->next = q; 
+    }  
+
+    if (flag_fileSort)
+    	flag_fileSort = 0;
+    else
+    	flag_fileSort = 1;
+    p = head;
+	while(p != 0) {
+		p->pos = getPos(context, tempItemCounter--);
+		p = p->next;
+	}
+
+    fileItemList = head;
+}
 
 // 文件项列表相关操作
 void addFileItem(struct stat st, char *name, Rect pos) {
@@ -362,9 +441,7 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		8 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "paste.bmp",
 		9 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "blank.bmp",
-		10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) } };
+				- (BUTTON_HEIGHT + 3) }  };
 
 void drawFinderWnd(Context context) {
 //	fill_rect(context, 0, 0, context.width, context.height, 0xFFFF);
@@ -380,15 +457,54 @@ void drawFinderWnd(Context context) {
 	puts_str(context, "Finder", 0, WINDOW_WIDTH / 2, 3);
 	//printf(0, "drawing window\n");
 	draw_iconlist(context, wndRes, sizeof(wndRes) / sizeof(ICON));
+	draw_searchbox();
 	puts_str(context, keyContent.content, 0, 10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) );
+				- (BUTTON_HEIGHT + 3) + 5);
 
 
 }
 
+void updateFileList(Context context) {
+	struct fileItem *p, *q;
+	int tempItemCounter = 0;
+	freeFileItemList();
+	list(".");
+	if (keyContent.length <= 0)
+		return;
+	p = fileItemList;
+	q = 0;
+	while(p != 0) {
+		if(!strstr(p->name, keyContent.content)) {
+			if(q == 0) {
+				fileItemList = fileItemList->next;
+				free(p->name);
+				free(p);
+				p = fileItemList;
+			}
+			else {
+				q->next = p->next;
+				p->next = 0;
+				free(p->name);
+				free(p);
+				p = q->next;
+			}
+		}
+		else {
+			tempItemCounter++;
+			q = p;
+			p = p->next;
+		}
+	}
+	p = fileItemList;
+	while(p != 0) {
+		p->pos = getPos(context, --tempItemCounter);
+		p = p->next;
+	}
+}
+
 void drawFinderContent(Context context) {
 	struct fileItem *p;
-	int tempItemCounter = 0;
+	//int tempItemCounter = 0;
 	//printf(0, "listing contents\n");
 
 	int contentTop = TOPBAR_HEIGHT + TOOLSBAR_HEIGHT;
@@ -402,8 +518,8 @@ void drawFinderContent(Context context) {
 	//printItemList();
 //	p = fileItemList;
 //	q = 0;
-	if (keyContent.length == 0) {
-		printf(0, "currently no searching pattern, so it should display all the files!\ndon't you think so?\n");
+	// if (keyContent.length == 0) {
+	// 	printf(0, "currently no searching pattern, so it should display all the files!\ndon't you think so?\n");
 //		freeFileItemList();
 //		list(".");
 		p = fileItemList;
@@ -412,19 +528,19 @@ void drawFinderContent(Context context) {
 			drawItem(context, p->name, p->st, p->pos, p->chosen);
 			p = p->next;
 		}
-	}
-	else{
-		p = fileItemList;
-		while(p != 0) {
-			printf(0, "now you are searching!\n");
-		   	if (strstr(p->name, keyContent.content)) {
-				drawItem(context, p->name, p->st, getPos(context, tempItemCounter++), p->chosen);
-				printf(0, "now you are searching! printing\n");
-		   	}
-			p = p->next;
+	// }
+	// else{
+	// 	p = fileItemList;
+	// 	while(p != 0) {
+	// 		printf(0, "now you are searching!\n");
+	// 	   	if (strstr(p->name, keyContent.content)) {
+	// 			drawItem(context, p->name, p->st, getPos(context, tempItemCounter++), p->chosen);
+	// 			printf(0, "now you are searching! printing\n");
+	// 	   	}
+	// 		p = p->next;
 			
-		}
-	}
+	// 	}
+	// }
 
 	if (style == LIST_STYLE)
 		{
@@ -514,7 +630,7 @@ void addListEvent(ClickableManager *cm) {
 }
 
 Handler wndEvents[] = { h_closeWnd, h_empty, h_chvm2, h_chvm1, h_newFolder,
-		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile, h_searchbox};
+		h_newFile, h_goUp, h_deleteFile, h_scrollDown, h_scrollUp, h_cutFile, h_copyFile, h_pasteFile};
 
 void addWndEvent(ClickableManager *cm) {
 	int i;
@@ -525,6 +641,7 @@ void addWndEvent(ClickableManager *cm) {
 						wndRes[i].pic.width, wndRes[i].pic.height), MSG_LPRESS,
 				wndEvents[i]);
 	}
+	createClickable(cm, initRect(LIST_ITEM_FILENAME, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + 1, LIST_ITEM_SIZE - LIST_ITEM_FILENAME - 1, TAGBAR_HEIGHT), MSG_LPRESS, h_fileSortByName);
 }
 
 struct fileItem * getFileItem(Point point) {
@@ -538,8 +655,27 @@ struct fileItem * getFileItem(Point point) {
 	return 0;
 }
 
+void h_fileSortByName(Point p) {
+	printf(0, "askjhdas\n");
+	fileSortByName();
+	drawFinderContent(context);
+	drawFinderWnd(context);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
+}
+
 void h_searchbox(Point p) {
 	isSearching = 1;
+}
+
+void scrollList(int offset) {
+	struct fileItem *q = fileItemList;
+	while (q != 0){
+		q->pos.start.y += offset;
+		q = q->next;
+	}
+	scrollOffset += offset;
 }
 
 void scrollDown() {
@@ -550,23 +686,24 @@ void scrollDown() {
 	// 	p = q;
 	// 	q = q->next;
 	// }
+	printf(0, "have you ever had sex?%d\n%d", fileItemList->pos.start.y, (WINDOW_HEIGHT - LIST_ITEM_HEIGHT));
 	if (style == ICON_STYLE){
 		if(q->pos.start.y > (WINDOW_HEIGHT - ICON_ITEM_HEIGHT)){
 			if(q->pos.start.y > WINDOW_HEIGHT){
-				scrollOffset -= SCROLL_UNIT;
+				scrollList(-SCROLL_UNIT);
 			}
 			else{
-				scrollOffset -= (q->pos.start.y - (WINDOW_HEIGHT - ICON_ITEM_HEIGHT));
+				scrollList(-(q->pos.start.y - (WINDOW_HEIGHT - ICON_ITEM_HEIGHT)));
 			}
 		}
 	}
 	else{
 		if(q->pos.start.y > (WINDOW_HEIGHT - LIST_ITEM_HEIGHT)){
 			if(q->pos.start.y > WINDOW_HEIGHT){
-				scrollOffset -= SCROLL_UNIT;
+				scrollList(-SCROLL_UNIT);
 			}
 			else{
-				scrollOffset -= (q->pos.start.y - (WINDOW_HEIGHT - LIST_ITEM_HEIGHT));
+				scrollList(-(q->pos.start.y - (WINDOW_HEIGHT - LIST_ITEM_HEIGHT)));
 			}
 		}
 	}
@@ -576,8 +713,8 @@ void scrollDown() {
 
 void h_scrollDown(Point p) {
 	scrollDown();
-	freeFileItemList();
-	list(".");
+//	updateFileList(context);
+//	fileSortByName();
 	drawFinderContent(context);
 	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -593,23 +730,25 @@ void scrollUp() {
 		p = q;
 		q = q->next;
 	}
+	printf(0, "the first file's y is tmd:%d\n", p->pos.start.y);
+	printf(0, "have you ever had sex?%d\n", fileItemList->pos.start.y);
 	if (style == ICON_STYLE){
 		if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT)){
 			if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT - ICON_ITEM_HEIGHT)){
-				scrollOffset += SCROLL_UNIT;
+				scrollList(SCROLL_UNIT);
 			}
 			else{
-				scrollOffset += -(p->pos.start.y - (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT));
+				scrollList((TOPBAR_HEIGHT + TOOLSBAR_HEIGHT) - p->pos.start.y);
 			}
 		}
 	}
 	else{
 		if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT)){
 			if(p->pos.start.y < (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT - LIST_ITEM_HEIGHT)){
-				scrollOffset += SCROLL_UNIT;
+				scrollList(SCROLL_UNIT);
 			}
 			else{
-				scrollOffset += -(p->pos.start.y - (TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT));
+				scrollList((TOPBAR_HEIGHT + TOOLSBAR_HEIGHT + TAGBAR_HEIGHT) - p->pos.start.y);
 			}
 		}
 	}
@@ -619,8 +758,8 @@ void scrollUp() {
 
 void h_scrollUp(Point p) {
 	scrollUp();
-	freeFileItemList();
-	list(".");
+//	updateFileList(context);
+//	fileSortByName();
 	drawFinderContent(context);
 	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -671,8 +810,7 @@ void enterDir(char *name) {
 void h_enterDir(Point p) {
 	struct fileItem *temp = getFileItem(p);
 	enterDir(temp->name);
-	freeFileItemList();
-	list(".");
+	updateFileList(context);
 	drawFinderContent(context);
 	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -710,8 +848,7 @@ void newFile(char *name) {
 void h_newFile(Point p) {
 	char nf[32] = "file.txt";
 	newFile(nf);
-	freeFileItemList();
-	list(".");
+	updateFileList(context);
 	drawFinderContent(context);
 	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -744,9 +881,8 @@ void newFolder(char *name) {
 void h_newFolder(Point p) {
 	char nf[32] = "newFolder";
 	newFolder(nf);
-	freeFileItemList();
 	printf(0, "new folder!\n");
-	list(".");
+	updateFileList(context);
 	printItemList();
 	drawFinderContent(context);
 	drawFinderWnd(context);
@@ -763,19 +899,16 @@ void deleteFile(char *name)
 			printf(2, "rm: %s failed to delete\n", name);
 		}
 		else{
-			freeFileItemList();
-			list(".");
+			updateFileList(context);
 			struct fileItem *p;
 			p = fileItemList;
 			while (p != 0) {
 				deleteFile(p->name);
-				freeFileItemList();
-				list(".");
+				updateFileList(context);
 				p = fileItemList;
 			}
 			chdir("..");
-			freeFileItemList();
-			list(".");
+			updateFileList(context);
 			unlink(name);
 		}
 	}
@@ -822,8 +955,7 @@ void h_deleteFile(Point p) {
 		free(p2);
 	}
 	printf(0, "done freeing!~~~\n");
-	freeFileItemList();
-	list(".");
+	updateFileList(context);
 	printItemList();
 	drawFinderContent(context);
 	drawFinderWnd(context);
@@ -918,8 +1050,7 @@ void h_pasteFile(Point p){
 	pasteFile();
 	if(copyOrCut == 1)
 		moveFile();
-    freeFileItemList();
-	list(".");
+    updateFileList(context);
 	drawFinderContent(context);
 	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -931,12 +1062,12 @@ void h_chooseFile(Point p) {
 	struct fileItem *temp = getFileItem(p);
 	if (temp->chosen != 0)
 	{
-		printf(0, "chooseFile!\n");
+		printf(0, "unchooseFile!\n");
 		temp->chosen = 0;
 	}
 	else
 	{
-		printf(0, "unchooseFile!\n");
+		printf(0, "chooseFile!\n");
 		temp->chosen = 1;
 	}
 	drawFinderContent(context);
@@ -949,8 +1080,7 @@ void h_closeWnd(Point p) {
 
 void h_chvm1(Point p) {
 	style = ICON_STYLE;
-	freeFileItemList();
-		list(".");
+	updateFileList(context);
 		drawFinderContent(context);
 	drawFinderWnd(context);
 			deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -960,8 +1090,7 @@ void h_chvm1(Point p) {
 
 void h_chvm2(Point p) {
 	style = LIST_STYLE;
-	freeFileItemList();
-		list(".");
+	updateFileList(context);
 		drawFinderContent(context);
 	drawFinderWnd(context);
 			deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -971,8 +1100,7 @@ void h_chvm2(Point p) {
 
 void h_goUp(Point p) {
 	enterDir("..");
-	freeFileItemList();
-	list(".");
+	updateFileList(context);
 	drawFinderContent(context);
 	drawFinderWnd(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
@@ -991,6 +1119,7 @@ int main(int argc, char *argv[]) {
 
 	Point p;
 
+	init_keyContent();
 	winid = init_context(&context, WINDOW_WIDTH, WINDOW_HEIGHT);
 	cm = initClickManager(context);
 	load_iconlist(wndRes, sizeof(wndRes) / sizeof(ICON));
@@ -999,8 +1128,7 @@ int main(int argc, char *argv[]) {
 	strcpy(currentPath, "/");
 	mkdir("userfolder");
 	enterDir("userfolder");
-	freeFileItemList();
-	list(".");
+	updateFileList(context);
 	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
 	addWndEvent(&cm);
 	addListEvent(&cm);
@@ -1032,10 +1160,14 @@ int main(int argc, char *argv[]) {
 			//printf(0, "left click event!\n");
 			p = initPoint(msg.concrete_msg.msg_mouse.x,
 					msg.concrete_msg.msg_mouse.y);
-			if (executeHandler(cm.left_click, p)) {
-
-				updateWindow(winid, context.addr);
-			}
+			// if (executeHandler(cm.left_click, p)) {
+			// 	updateWindow(winid, context.addr);
+			// }
+			executeHandler(cm.left_click, p);
+			draw_searchbox();
+			puts_str(context, keyContent.content, 0, 10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
+				- (BUTTON_HEIGHT + 3) + 5);
+			updateWindow(winid, context.addr);
 			break;
 		case MSG_RPRESS:
 			p = initPoint(msg.concrete_msg.msg_mouse.x,
@@ -1049,11 +1181,17 @@ int main(int argc, char *argv[]) {
 			if (isSearching) {
 				if (((key=='_')||(key=='.')||(key>='0'&&key<='9')||(key>='a'&&key<='z')||(key>='A'&&key<='Z')) && (keyContent.length<MAX_KEYLENGTH)) {
 					keyContent.content[keyContent.length++] = key;
+					scrollOffset = 0;
 					printf(0, "%s\n", keyContent.content);
 				}
 				else if (key == 8 && keyContent.length > 0) {
 					keyContent.content[--keyContent.length] = 0;
+					scrollOffset = 0;
 				}
+				deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+				addWndEvent(&cm);
+				updateFileList(context);
+				addListEvent(&cm);
 				drawFinderContent(context);
 				drawFinderWnd(context);
 				updateWindow(winid, context.addr);
