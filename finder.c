@@ -98,6 +98,7 @@ int itemCounter = 0; // 第几个文件
 void addItemEvent(ClickableManager *cm, struct fileItem item);
 void addListEvent(ClickableManager *cm);
 struct fileItem * getFileItem(Point p); //跟据点击位置，获取文件信息
+void pasteJustFile(char* src, char* dest);
 
 // Handlers
 void h_enterDir(Point p);
@@ -371,7 +372,7 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", WINDOW_WIDTH
 		9 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "blank.bmp",
 		10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "blank.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "cut.bmp",
 		2 * BUTTON_WIDTH, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }  };
 
@@ -842,20 +843,36 @@ void h_deleteFile(Point p) {
 }
 
 void saveRename(){
+	char tempName[MAX_NAME_LEN + 2];
+	int i;
+	strcpy(tempName, currentlyRenaming->name);
+	for(i = 0; i < strlen(tempName); i++){
+		if(tempName[i] == '.'){
+			pasteJustFile(renameFrom, tempName);
+			deleteFile(renameFrom);
+			return;
+		}
+	}
+	tempName[i] = '.';
+	tempName[i + 1] = 0;
+	pasteJustFile(renameFrom, tempName);
+	deleteFile(renameFrom);
 }
 
 void unrename(){
+	printf(0, "renaming! currentlyRenaming: %s\n", currentlyRenaming->name);
 	saveRename();
 	currentlyRenaming->chosen = 1;
 	currentlyRenaming = 0;
+	renaming = 0;
 	freeFileItemList();
 	list(".");
 	printItemList();
 	drawFinderContent(context);
 	drawFinderWnd(context);
-		deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
-		addWndEvent(&cm);
-		addListEvent(&cm);
+	deleteClickable(&cm.left_click, initRect(0, 0, 800, 600));
+	addWndEvent(&cm);
+	addListEvent(&cm);
 }
 
 void copyFile(){
@@ -1019,13 +1036,13 @@ void rename() {
 		if (temp->chosen == 1){
 			currentlyRenaming = temp;
 			temp->chosen = 2;
+			strcpy(renameFrom, temp->name);
+			renaming = 1;
 			break;
 		}
 		else
 			temp = temp->next;
 	}
-	strcpy(renameFrom, temp->name);
-	renaming = 1;
 }
 
 void h_rename(Point p) {
@@ -1082,8 +1099,10 @@ int main(int argc, char *argv[]) {
 			//printf(0, "left click event!\n");
 			p = initPoint(msg.concrete_msg.msg_mouse.x,
 					msg.concrete_msg.msg_mouse.y);
-			if(renaming == 1)
+			if(renaming == 1){
 				unrename();
+				updateWindow(winid, context.addr);
+			}
 			if (executeHandler(cm.left_click, p)) {
 				updateWindow(winid, context.addr);
 			}
@@ -1116,6 +1135,8 @@ int main(int argc, char *argv[]) {
 				}
 				else if (key == 8 && (strlen(currentlyRenaming->name)>0)) {
 					currentlyRenaming->name[strlen(currentlyRenaming->name) - 1] = 0;
+				} else if (key == '\n') {
+					unrename();
 				}
 				drawFinderContent(context);
 				drawFinderWnd(context);
