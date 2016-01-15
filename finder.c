@@ -988,8 +988,8 @@ void saveRename(){
 			if(tempName[i] == '.'){
 				if(pasteJustFile(tempNameFrom, tempName)){
 					deleteFile(tempNameFrom);
-					return;
 				}
+				return;
 			}
 		}
 		tempName[i] = '.';
