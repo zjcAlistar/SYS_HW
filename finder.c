@@ -450,7 +450,7 @@ struct Icon wndRes[] = { { "close.bmp", 3, 3 }, { "foldericon.bmp", 20, 3 }, { "
 		9 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }, { "blank.bmp",
 		10 * BUTTON_WIDTH + 100, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
-				- (BUTTON_HEIGHT + 3) }, { "cut.bmp",
+				- (BUTTON_HEIGHT + 3) }, { "rename.bmp",
 		2 * BUTTON_WIDTH + 7, TOPBAR_HEIGHT + TOOLSBAR_HEIGHT
 				- (BUTTON_HEIGHT + 3) }  };
 
